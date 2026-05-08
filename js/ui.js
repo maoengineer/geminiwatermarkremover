@@ -171,8 +171,13 @@ function setupPreviewCard() {
      (engine doesn't intercept drop events — we must handle these)
   ══════════════════════════════════ */
   if (uploadArea) {
-    // Click: stopPropagation so engine's click handler doesn't also call fileInput.click()
+    // Same pattern as React: zone click opens dialog, but fileInput click stops propagation
+    // so it never bubbles back up to uploadArea and triggers a second fileInput.click()
+    if (fileInput) {
+      fileInput.addEventListener('click', (e) => e.stopPropagation());
+    }
     uploadArea.addEventListener('click', (e) => {
+      if (e.target.type === 'file') return; // clicked the input itself — let it be
       e.stopPropagation();
       if (fileInput && fileInput._origClick) fileInput._origClick();
       else if (fileInput) fileInput.click();
