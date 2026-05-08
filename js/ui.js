@@ -68,13 +68,20 @@ function setupPreviewCard() {
   let currentMode  = 'before';
   let cardShown    = false;
 
-  /* ── Show preview card ── */
-  function showCard(src) {
-    if (cardShown) return; // prevent double-show
+  /* ── Show preview card (accepts File object or data-URL string) ── */
+  function showCard(fileOrSrc) {
+    if (cardShown) return;
+    if (fileOrSrc instanceof File) {
+      // Read file to data-URL then show
+      const reader = new FileReader();
+      reader.onload = (ev) => showCard(ev.target.result);
+      reader.readAsDataURL(fileOrSrc);
+      return;
+    }
     cardShown = true;
-    originalSrc = src;
+    originalSrc = fileOrSrc;
     currentMode = 'before';
-    pcardDisplay.src = src;
+    pcardDisplay.src = fileOrSrc;
     hide(uploadArea);
     show(previewCard);
     show(pcardProcess);
@@ -166,47 +173,59 @@ function setupPreviewCard() {
     }).observe(dlBtn, { attributes: true, attributeFilter: ['style'] });
   }
 
-  /* ══════════════════════════════════
-     Drag & Drop on upload area
-     (engine doesn't intercept drop events — we must handle these)
-  ══════════════════════════════════ */
-  if (uploadArea) {
-    // Same pattern as React: zone click opens dialog, but fileInput click stops propagation
-    // so it never bubbles back up to uploadArea and triggers a second fileInput.click()
-    if (fileInput) {
-      fileInput.addEventListener('click', (e) => e.stopPropagation());
-    }
-    uploadArea.addEventListener('click', (e) => {
-      if (e.target.type === 'file') return; // clicked the input itself — let it be
-      e.stopPropagation();
-      if (fileInput && fileInput._origClick) fileInput._origClick();
-      else if (fileInput) fileInput.click();
-    });
-    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); uploadArea.classList.add('dragover'); });
-    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-    uploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation(); // prevent engine's own drop handler
-      uploadArea.classList.remove('dragover');
-      const file = e.dataTransfer?.files[0];
-      if (!file || !file.type.startsWith('image/')) return;
-      // Immediately show preview via FileReader (fast UX)
-      const reader = new FileReader();
-      reader.onload = (ev) => showCard(ev.target.result);
-      reader.readAsDataURL(file);
-      // Feed file to engine via fileInput change event
-      try {
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        fileInput.files = dt.files;
-        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-      } catch (_) {}
+  /* ══════════════════════════════════════════════════════
+     CLEAN PATTERN (React-equivalent vanilla JS):
+       fileInput onChange → showCard()   (dialog select)
+       uploadArea onClick → fileInput.click()
+       uploadArea onDrop  → showCard(file) + feed engine
+  ══════════════════════════════════════════════════════ */
+  let _fromDrop = false;
+
+  if (fileInput) {
+    // Stop click from bubbling back up to uploadArea
+    fileInput.addEventListener('click', (e) => e.stopPropagation());
+    // onChange: dialog selection only (drop sets _fromDrop to skip this)
+    fileInput.addEventListener('change', (e) => {
+      if (_fromDrop) return;
+      const file = e.target.files[0];
+      if (file) showCard(file);
     });
   }
 
-  /* ══════════════════════════════════
-     Ctrl+V paste
-  ══════════════════════════════════ */
+  if (uploadArea) {
+    // Click → open file dialog (simple, like React onClick)
+    uploadArea.addEventListener('click', (e) => {
+      if (e.target.type === 'file') return;
+      e.stopPropagation();
+      if (fileInput._origClick) fileInput._origClick();
+      else fileInput?.click();
+    });
+
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+
+    // Drop → showCard directly + feed engine via fileInput
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      uploadArea.classList.remove('dragover');
+      const file = e.dataTransfer?.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      showCard(file);
+      try {
+        _fromDrop = true;
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: false }));
+      } catch (_) {} finally { _fromDrop = false; }
+    });
+  }
+
+  /* Ctrl+V paste */
   document.addEventListener('paste', (e) => {
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -214,19 +233,19 @@ function setupPreviewCard() {
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile();
         if (!file) break;
-        const reader = new FileReader();
-        reader.onload = (ev) => showCard(ev.target.result);
-        reader.readAsDataURL(file);
+        showCard(file);
         try {
+          _fromDrop = true;
           const dt = new DataTransfer();
           dt.items.add(file);
           fileInput.files = dt.files;
-          fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-        } catch (_) {}
+          fileInput.dispatchEvent(new Event('change', { bubbles: false }));
+        } catch (_) {} finally { _fromDrop = false; }
         break;
       }
     }
   });
+
 
   /* Toggle buttons */
   pcardBefore?.addEventListener('click', () => setMode('before'));
