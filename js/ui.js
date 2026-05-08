@@ -116,6 +116,11 @@ function setupPreviewCard() {
     if (pcardDisplay) pcardDisplay.src = '';
     hide(previewCard);
     show(uploadArea);
+    // Restore fileInput.click so user can select again
+    if (fileInput && fileInput._origClick) {
+      fileInput.click = fileInput._origClick;
+      delete fileInput._origClick;
+    }
     if (fileInput) fileInput.value = '';
     uploadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
@@ -128,7 +133,12 @@ function setupPreviewCard() {
   if (origImg) {
     origImg.addEventListener('load', () => {
       if (origImg.src && origImg.naturalWidth > 0 && origImg.src !== window.location.href) {
-        showCard(origImg.src); // show card with engine's own loaded image
+        showCard(origImg.src);
+        // Block engine from re-opening file dialog while card is shown
+        if (fileInput && !fileInput._origClick) {
+          fileInput._origClick = fileInput.click.bind(fileInput);
+          fileInput.click = () => { /* no-op while card shown */ };
+        }
       }
     });
   }
@@ -161,11 +171,17 @@ function setupPreviewCard() {
      (engine doesn't intercept drop events — we must handle these)
   ══════════════════════════════════ */
   if (uploadArea) {
+    // Click: stopPropagation so engine's click handler doesn't also call fileInput.click()
+    uploadArea.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (fileInput && fileInput._origClick) fileInput._origClick();
+      else if (fileInput) fileInput.click();
+    });
     uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); uploadArea.classList.add('dragover'); });
     uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
     uploadArea.addEventListener('drop', (e) => {
       e.preventDefault();
-      e.stopPropagation(); // ← prevent engine's own drop handler from firing & resetting UI
+      e.stopPropagation(); // prevent engine's own drop handler
       uploadArea.classList.remove('dragover');
       const file = e.dataTransfer?.files[0];
       if (!file || !file.type.startsWith('image/')) return;
