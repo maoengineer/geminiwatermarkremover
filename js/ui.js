@@ -161,10 +161,11 @@ function setupPreviewCard() {
      (engine doesn't intercept drop events — we must handle these)
   ══════════════════════════════════ */
   if (uploadArea) {
-    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); uploadArea.classList.add('dragover'); });
     uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
     uploadArea.addEventListener('drop', (e) => {
       e.preventDefault();
+      e.stopPropagation(); // ← prevent engine's own drop handler from firing & resetting UI
       uploadArea.classList.remove('dragover');
       const file = e.dataTransfer?.files[0];
       if (!file || !file.type.startsWith('image/')) return;
