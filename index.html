@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gemini Watermark Remover — Free Online Tool | 100% Local Processing</title>
+  <meta name="description" content="Remove Google Gemini AI watermarks from your images instantly. 100% browser-side processing — your images never leave your device. Free, no sign-up." />
+  <meta name="keywords" content="gemini watermark remover, remove gemini watermark, google gemini image, ai watermark remover, free watermark tool" />
+  <link rel="canonical" href="https://geminiclean.online/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://geminiclean.online/" />
+  <meta property="og:title" content="Gemini Watermark Remover — Free Online Tool" />
+  <meta property="og:description" content="Remove Google Gemini AI watermarks instantly. 100% local processing. No uploads. Free." />
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Gemini Watermark Remover","url":"https://geminiclean.online","description":"Free online tool to remove Google Gemini AI watermarks. 100% client-side.","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="images/favicon.ico" />
+  <script src="https://cdn.lordicon.com/lordicon.js"></script>
+  <style>
+    /* ── Tool hero layout ── */
+    .tool-hero { padding: 3rem 0 0; text-align: center; }
+    .tool-hero h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); margin-bottom: 0.75rem; }
+    .tool-hero .sub { max-width: 580px; margin: 0 auto 0.5rem; font-size: 1rem; }
+    .tool-hero .badges { display:flex; gap:0.6rem; justify-content:center; flex-wrap:wrap; margin:1rem 0 2rem; }
+
+    /* ── Upload zone ── */
+    #uploadArea {
+      border: 2px dashed rgba(99,102,241,0.45);
+      border-radius: var(--radius-xl);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: rgba(99,102,241,0.04);
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    #uploadArea:hover, #uploadArea.dragover {
+      border-color: var(--indigo);
+      background: rgba(99,102,241,0.09);
+      box-shadow: var(--shadow-glow);
+    }
+    /* Hide native file-input — engine clicks it via uploadArea click */
+    #fileInput { display: none !important; }
+    #uploadArea h3 { margin: 0.75rem 0 0.35rem; color: var(--text-primary); }
+    .paste-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.4rem; }
+    /* When result is shown, hide upload zone */
+    body.has-result #uploadArea { display: none; }
+
+    /* ── Stats bar ── */
+    .stats-bar { display:flex; justify-content:center; gap:2.5rem; flex-wrap:wrap; padding:1.5rem 0; border-top:1px solid var(--border); margin-top:2rem; }
+    .stats-bar .stat { text-align:center; }
+    .stats-bar .stat-num { font-size:1.5rem; font-weight:800; }
+    .stats-bar .stat-label { font-size:0.78rem; color:var(--text-muted); }
+
+    /* ── Result panel ── */
+    #singlePreview { margin-top: 1.5rem; max-width: 860px; margin-left: auto; margin-right: auto; }
+    .compare-panel {
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      box-shadow: var(--shadow-card);
+      user-select: none;
+    }
+
+    /* ── Comparison slider — critical fix ── */
+    #comparisonContainer {
+      position: relative;
+      /* inline-block so it exactly hugs the originalImage dimensions */
+      display: block;
+      overflow: hidden;
+      max-height: 520px;
+      background: repeating-conic-gradient(#1a1a2e 0% 25%, #0e0e1a 25% 50%) 0 0 / 20px 20px;
+      text-align: center; /* center inline-block child */
+    }
+    /* originalImage sets the container dimensions */
+    #originalImage {
+      display: block;
+      width: 100%;
+      max-height: 520px;
+      height: auto;
+      object-fit: contain;
+      object-position: center;
+    }
+    /* processedOverlay clips the left portion showing the 'After' */
+    #processedOverlay {
+      position: absolute;
+      top: 0; left: 0;
+      height: 100%;
+      overflow: hidden;
+      border-right: 2px solid rgba(255,255,255,0.85);
+      box-shadow: 2px 0 12px rgba(0,0,0,0.4);
+      /* width is set to 50% by engine inline style — keep it */
+    }
+    /* processedImage must match originalImage rendered size exactly */
+    #processedImage {
+      display: block;
+      /* engine sets this via inline style width — we also enforce it */
+      max-width: none;
+      height: 100%;
+      /* object-fit contain centres it like originalImage */
+      object-fit: contain;
+      object-position: center;
+    }
+    /* Slider drag handle */
+    #sliderHandle {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 44px; margin-left: -22px;
+      z-index: 20; cursor: col-resize;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .knob {
+      width: 40px; height: 40px; background: #fff; border-radius: 50%;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.55);
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid rgba(99,102,241,0.4);
+    }
+    .compare-label {
+      position: absolute; top: 12px; font-size: 0.72rem; font-weight: 700;
+      background: rgba(0,0,0,0.6); color: #fff; padding: 3px 10px;
+      border-radius: 20px; pointer-events: none; z-index: 30;
+      backdrop-filter: blur(4px); letter-spacing: 0.04em;
+    }
+    .compare-label-before { right: 12px; }
+    .compare-label-after  { left: 12px; }
+
+    /* ── Action bar ── */
+    .result-bar {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.85rem 1.25rem;
+      background: rgba(0,0,0,0.35); border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    /* Hide the Chinese info spans the engine populates */
+    #originalInfo, #processedInfo { display: none !important; }
+    #statusMessage {
+      flex: 1; font-size: 0.8rem; color: var(--text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #copyBtn, #downloadBtn, #resetBtn {
+      display: inline-flex !important; /* override engine hiding */
+      align-items: center; gap: 6px;
+      font-family: 'Inter', sans-serif; font-size: 0.82rem; font-weight: 600;
+      padding: 0.5rem 1.1rem; border-radius: var(--radius-md);
+      cursor: pointer; transition: var(--transition); border: none;
+      white-space: nowrap;
+    }
+    /* Engine sets display:none via inline style — use visibility trick when hidden */
+    #copyBtn[style*="display: none"],
+    #downloadBtn[style*="display: none"] { display: none !important; }
+    #copyBtn    { background: rgba(99,102,241,0.18); color: #a78bfa; border: 1px solid rgba(99,102,241,0.3); }
+    #downloadBtn{ background: var(--grad-btn); color: #fff; }
+    #resetBtn   { background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 1px solid var(--border); }
+    #copyBtn:hover    { background: rgba(99,102,241,0.32); }
+    #downloadBtn:hover{ transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.5); }
+    #resetBtn:hover   { background: rgba(255,255,255,0.12); color: var(--text-primary); }
+
+    /* ── Loading overlay ── */
+    #loadingOverlay {
+      position: fixed; inset: 0; background: rgba(7,7,17,0.82);
+      backdrop-filter: blur(8px); z-index: 9000;
+      display: none; align-items: center; justify-content: center;
+      flex-direction: column; gap: 1rem;
+    }
+    #loadingOverlay.active, #loadingOverlay:not(.hidden) { display: flex; }
+    .spinner {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 3px solid rgba(99,102,241,0.2);
+      border-top-color: #6366f1;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ══ PREVIEW CARD ══ */
+    #previewCard { max-width: 680px; margin: 0 auto; }
+    .pcard {
+      position: relative;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      backdrop-filter: blur(12px);
+    }
+    /* Close × button */
+    .pcard-close {
+      position: absolute; top: 12px; right: 12px; z-index: 10;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(0,0,0,0.5); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; transition: background 0.2s;
+    }
+    .pcard-close:hover { background: rgba(239,68,68,0.75); }
+    /* Image area */
+    .pcard-img-wrap {
+      position: relative;
+      background: repeating-conic-gradient(#111 0% 25%, #1a1a1a 25% 50%) 0 0 / 16px 16px;
+      min-height: 220px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    #pcardDisplay {
+      display: block; max-width: 100%; max-height: 520px;
+      height: auto; object-fit: contain;
+    }
+    /* In-card processing overlay */
+    .pcard-processing {
+      position: absolute; inset: 0;
+      background: rgba(7,7,17,0.72); backdrop-filter: blur(4px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      color: var(--text-secondary); font-size: 0.875rem;
+    }
+    .pcard-spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid rgba(99,102,241,0.25);
+      border-top-color: #6366f1;
+      animation: spin 0.75s linear infinite;
+    }
+    /* Before / After toggle */
+    .pcard-toggle {
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px; padding: 12px 16px;
+      background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .pcard-toggle-btn {
+      padding: 6px 22px; border-radius: 20px;
+      font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: transparent; color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+    .pcard-toggle-btn.active {
+      background: #fff; color: #111; border-color: transparent;
+    }
+    /* Action buttons row */
+    .pcard-actions {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; padding: 14px 16px; flex-wrap: wrap;
+      background: rgba(0,0,0,0.25); border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .pcard-btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 18px; border-radius: 10px; font-size: 0.83rem;
+      font-weight: 600; cursor: pointer; transition: all 0.2s;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.07); color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+    }
+    .pcard-btn:hover { background: rgba(255,255,255,0.14); transform: translateY(-1px); }
+    .pcard-btn-primary {
+      background: var(--grad-btn); color: #fff; border-color: transparent;
+    }
+    .pcard-btn-primary:hover { box-shadow: 0 6px 20px rgba(99,102,241,0.45); }
+
+
+  </style>
+
+</head>
+<body>
+<div class="bg-mesh"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar" role="navigation" aria-label="Main navigation">
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-icon">
+      <lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="loop" delay="2000" colors="primary:#ffffff" style="width:22px;height:22px"></lord-icon>
+    </div>
+    <span>GeminiClean</span>
+  </a>
+  <ul class="nav-links" id="navLinks" role="list">
+    <li><a href="index.html" class="active">Tool</a></li>
+    <li><a href="how-it-works.html">How It Works</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html">Contact</a></li>
+  </ul>
+  <button class="nav-hamburger" id="navHamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+</nav>
+
+<main class="page-wrap" id="mainContent">
+
+  <!-- ══ HERO ══ -->
+  <section class="tool-hero container" aria-labelledby="heroHeading">
+    <div class="animate-fade-up">
+      <span class="section-label">
+        <lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="loop" delay="3000" colors="primary:#a78bfa" style="width:14px;height:14px"></lord-icon>
+        100% Free &amp; Private
+      </span>
+    </div>
+    <h1 id="heroHeading" class="animate-fade-up delay-1">Gemini Watermark Remover</h1>
+    <p class="sub animate-fade-up delay-2">
+      Free online tool to remove Gemini watermarks, logos, and star overlays.<br>
+      <strong>No upload, no sign-up</strong> — 100% local, private processing.
+    </p>
+    <div class="badges animate-fade-up delay-3">
+      <span class="badge badge-purple">Local Only</span>
+      <span class="badge badge-cyan">Math Precision</span>
+      <span class="badge badge-green">Lossless PNG</span>
+    </div>
+
+    <!-- ══ UPLOAD ZONE — id="uploadArea" required by engine ══ -->
+    <div id="uploadArea" class="animate-fade-up delay-4" role="button" tabindex="0" aria-label="Upload image to remove Gemini watermark">
+      <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" aria-label="Select image file" />
+      <lord-icon src="https://cdn.lordicon.com/wloilxuq.json" trigger="hover" colors="primary:#6366f1,secondary:#8b5cf6" style="width:56px;height:56px;margin:0 auto;pointer-events:none;"></lord-icon>
+      <h3>Drop Your Image Here</h3>
+      <p style="font-size:0.875rem;color:var(--text-secondary);">or click to browse — PNG, JPEG, WebP · Max 20 MB</p>
+      <p class="paste-hint">Paste with <kbd style="background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:0.75rem;">Ctrl+V</kbd></p>
+    </div>
+
+    <!-- ══ Engine DOM (hidden — engine needs these IDs) ══ -->
+    <div id="singlePreview" style="display:none; position:absolute; pointer-events:none; opacity:0; width:1px; height:1px; overflow:hidden;">
+      <img id="originalImage" alt="" />
+      <div id="processedOverlay" style="width:50%;">
+        <img id="processedImage" alt="" />
+      </div>
+      <div id="sliderHandle" style="left:50%;"></div>
+      <span id="originalInfo"></span>
+      <span id="processedInfo"></span>
+      <span id="statusMessage"></span>
+      <button id="copyBtn">Copy</button>
+      <button id="downloadBtn">Download</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+
+    <!-- ══ OUR BEAUTIFUL PREVIEW CARD (replaces upload zone visually) ══ -->
+    <div id="previewCard" style="display:none;" class="animate-fade-up">
+      <div class="pcard">
+        <!-- Close / reset button -->
+        <button class="pcard-close" id="pcardClose" title="Remove image">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <!-- Image display area -->
+        <div class="pcard-img-wrap" id="pcardImgWrap">
+          <img id="pcardDisplay" alt="Image preview" draggable="false" />
+          <!-- Processing spinner inside card -->
+          <div class="pcard-processing" id="pcardProcessing">
+            <div class="pcard-spinner"></div>
+            <span>Removing watermark…</span>
+          </div>
+        </div>
+        <!-- Before / After toggle -->
+        <div class="pcard-toggle" id="pcardToggle" style="display:none;">
+          <button class="pcard-toggle-btn active" id="pcardBefore" data-mode="before">Before</button>
+          <button class="pcard-toggle-btn" id="pcardAfter" data-mode="after">After</button>
+        </div>
+        <!-- Action buttons -->
+        <div class="pcard-actions" id="pcardActions" style="display:none;">
+          <button class="pcard-btn pcard-btn-primary" id="pcardDownload">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Free download
+          </button>
+          <button class="pcard-btn" id="pcardCopy">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            Copy image
+          </button>
+          <button class="pcard-btn" id="pcardAddMore">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add more
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar animate-fade-up">
+      <div class="stat"><div class="stat-num gradient-text">100%</div><div class="stat-label">Local Processing</div></div>
+      <div class="stat"><div class="stat-num gradient-text">0</div><div class="stat-label">Data Uploaded</div></div>
+      <div class="stat"><div class="stat-num gradient-text">Free</div><div class="stat-label">Always &amp; Forever</div></div>
+      <div class="stat"><div class="stat-num gradient-text">PNG</div><div class="stat-label">Lossless Output</div></div>
+    </div>
+  </section>
+
+  <!-- ══ FEATURES ══ -->
+  <section class="section" style="background:var(--bg-secondary);" aria-labelledby="featuresHeading">
+    <div class="container">
+      <div style="text-align:center;margin-bottom:2.5rem;">
+        <span class="section-label">Why GeminiClean</span>
+        <h2 id="featuresHeading">Everything You Need</h2>
+      </div>
+      <div class="feature-grid">
+        <div class="glass-card feature-card reveal">
+          <div class="feature-icon-wrap"><lord-icon src="https://cdn.lordicon.com/ndydpcaq.json" trigger="hover" colors="primary:#6366f1" style="width:28px;height:28px"></lord-icon></div>
+          <h3>100% Local Processing</h3>
+          <p>All computation happens inside your browser. Your images are never uploaded to any server.</p>
+          <span class="badge badge-green">Privacy First</span>
+        </div>
+        <div class="glass-card feature-card reveal delay-1">
+          <div class="feature-icon-wrap"><lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="hover" colors="primary:#8b5cf6" style="width:28px;height:28px"></lord-icon></div>
+          <h3>Mathematical Precision</h3>
+          <p>Based on Reverse Alpha Blending — the exact inverse of how Gemini applies watermarks.</p>
+          <span class="badge badge-purple">Zero Hallucinations</span>
+        </div>
+        <div class="glass-card feature-card reveal delay-2">
+          <div class="feature-icon-wrap"><lord-icon src="https://cdn.lordicon.com/hwjcdmbl.json" trigger="hover" colors="primary:#06b6d4" style="width:28px;height:28px"></lord-icon></div>
+          <h3>Auto-Detection</h3>
+          <p>Identifies watermark size and position using Gemini's full official image size catalog.</p>
+          <span class="badge badge-cyan">Smart Engine</span>
+        </div>
+        <div class="glass-card feature-card reveal">
+          <div class="feature-icon-wrap"><lord-icon src="https://cdn.lordicon.com/xcrjfuzb.json" trigger="hover" colors="primary:#6366f1" style="width:28px;height:28px"></lord-icon></div>
+          <h3>Lossless PNG Output</h3>
+          <p>Export cleaned images as high-quality lossless PNG — no compression artifacts.</p>
+          <span class="badge badge-green">High Quality</span>
+        </div>
+        <div class="glass-card feature-card reveal delay-1">
+          <div class="feature-icon-wrap"><lord-icon src="https://cdn.lordicon.com/rqsvgwti.json" trigger="hover" colors="primary:#8b5cf6" style="width:28px;height:28px"></lord-icon></div>
+          <h3>Before &amp; After Slider</h3>
+          <p>Compare original and cleaned image side-by-side with an interactive drag slider.</p>
+          <span class="badge badge-purple">Visual Compare</span>
+        </div>
+        <div class="glass-card feature-card reveal delay-2">
+          <div class="feature-icon-wrap"><lord-icon src="https://cdn.lordicon.com/oqdmuxru.json" trigger="hover" colors="primary:#06b6d4" style="width:28px;height:28px"></lord-icon></div>
+          <h3>Completely Free</h3>
+          <p>No sign-up, no credits, no subscriptions. The full engine is free to use indefinitely.</p>
+          <span class="badge badge-cyan">No Cost</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ HOW TO USE ══ -->
+  <section class="section" aria-labelledby="stepsHeading">
+    <div class="container">
+      <div style="text-align:center;margin-bottom:2.5rem;">
+        <span class="section-label">Quick Guide</span>
+        <h2 id="stepsHeading">Remove a Watermark in 3 Steps</h2>
+      </div>
+      <div class="steps-grid">
+        <div class="glass-card step-card reveal">
+          <div class="step-number">1</div>
+          <lord-icon src="https://cdn.lordicon.com/wloilxuq.json" trigger="in" colors="primary:#6366f1" style="width:48px;height:48px;margin:0 auto 0.85rem;"></lord-icon>
+          <h3>Upload Your Image</h3>
+          <p>Drag &amp; drop, click to browse, or press <kbd style="background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:0.8rem;">Ctrl+V</kbd> to paste.</p>
+        </div>
+        <div class="glass-card step-card reveal delay-1">
+          <div class="step-number">2</div>
+          <lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="in" delay="300" colors="primary:#8b5cf6" style="width:48px;height:48px;margin:0 auto 0.85rem;"></lord-icon>
+          <h3>Auto-Process</h3>
+          <p>The engine automatically detects and removes the Gemini watermark using Reverse Alpha Blending.</p>
+        </div>
+        <div class="glass-card step-card reveal delay-2">
+          <div class="step-number">3</div>
+          <lord-icon src="https://cdn.lordicon.com/xcrjfuzb.json" trigger="in" delay="600" colors="primary:#06b6d4" style="width:48px;height:48px;margin:0 auto 0.85rem;"></lord-icon>
+          <h3>Download PNG</h3>
+          <p>Preview with the compare slider and download your clean, watermark-free lossless PNG.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FAQ ══ -->
+  <section class="section" style="background:var(--bg-secondary);" aria-labelledby="faqHeading">
+    <div class="container" style="max-width:800px;">
+      <div style="text-align:center;margin-bottom:2.5rem;">
+        <span class="section-label">FAQ</span>
+        <h2 id="faqHeading">Frequently Asked Questions</h2>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">Is my image uploaded anywhere?<svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-answer"><p>No. All processing happens 100% inside your browser using Canvas API and Web Workers. Your images never leave your device.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">What types of watermarks can this remove?<svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-answer"><p>This specifically targets the visible semi-transparent Google Gemini sparkle watermark in the bottom-right corner of Gemini-generated images. It does not remove invisible SynthID watermarks.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">How does Reverse Alpha Blending work?<svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-answer"><p>Gemini applies its watermark using: <code>watermarked = α × logo + (1−α) × original</code>. Since the logo and alpha are known, we solve: <code>original = (watermarked − α × logo) / (1−α)</code>. Mathematically exact — not AI-guessing.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">What file formats are supported?<svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-answer"><p>Upload PNG, JPEG, or WebP. Output is always lossless PNG.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">Is this tool free?<svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-answer"><p>Yes, completely free. No account, no subscription, no usage limits.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="display:inline-flex;margin-bottom:0.75rem;">
+          <div class="nav-logo-icon"><lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="loop" delay="2000" colors="primary:#ffffff" style="width:18px;height:18px"></lord-icon></div>
+          <span>GeminiClean</span>
+        </a>
+        <p>The most reliable, privacy-first Gemini AI watermark removal tool.</p>
+      </div>
+      <div class="footer-col"><h4>Tool</h4><a href="index.html">Watermark Remover</a><a href="how-it-works.html">How It Works</a><a href="about.html">About</a></div>
+      <div class="footer-col"><h4>Support</h4><a href="contact.html">Contact Us</a></div>
+      <div class="footer-col"><h4>Legal</h4><a href="privacy-policy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a></div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2025 GeminiClean. All rights reserved.</span>
+      <div style="display:flex;gap:1.25rem;"><a href="privacy-policy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></div>
+    </div>
+  </div>
+</footer>
+
+<!-- Loading overlay — engine toggles class "active" -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <p style="color:var(--text-secondary);font-size:0.875rem;">Processing locally…</p>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- Real GWR engine (built from GargantuaX/gemini-watermark-remover) -->
+<script src="js/gwr-engine.js"></script>
+<!-- Our UI helpers (navbar, FAQ, paste) -->
+<script src="js/ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Exclude the cloned GWR source repo (large, not our code)
+gwr-src/
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
