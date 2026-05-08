@@ -1,23 +1,14 @@
 'use strict';
 /**
- * GeminiClean — UI layer
- * Engine: js/gwr-engine.js  (GargantuaX/gemini-watermark-remover build)
- *
- * Flow:
- *  1. User drops / selects / pastes image
- *  2. Upload zone hides → previewCard shows with original photo
- *  3. Loading spinner overlays the card while engine processes
- *  4. Engine writes to #processedImage → we detect → show After toggle + action buttons
- *  5. Before/After toggle switches pcardDisplay src
- *  6. "Add more" / × resets everything back to upload zone
+ * GeminiClean UI layer
+ * Fix: watch #originalImage.load as primary trigger (works for both dialog select AND drag/drop)
  */
 
-/* ─── helpers ─── */
-const $  = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 const show = (el) => { if (el) el.style.display = ''; };
 const hide = (el) => { if (el) el.style.display = 'none'; };
 
-/* ─── Navbar ─── */
+/* ── Navbar ── */
 function setupNavbar() {
   const ham = $('navHamburger'), links = $('navLinks');
   if (!ham || !links) return;
@@ -28,23 +19,23 @@ function setupNavbar() {
   });
 }
 
-/* ─── FAQ accordion ─── */
+/* ── FAQ accordion ── */
 function setupFAQ() {
   document.querySelectorAll('.faq-question').forEach((btn) => {
     btn.addEventListener('click', function () {
       const item = this.closest('.faq-item');
       if (!item) return;
-      const open = item.classList.contains('open');
+      const isOpen = item.classList.contains('open');
       document.querySelectorAll('.faq-item').forEach((el) => {
         el.classList.remove('open');
         el.querySelector('.faq-question')?.setAttribute('aria-expanded', 'false');
       });
-      if (!open) { item.classList.add('open'); this.setAttribute('aria-expanded', 'true'); }
+      if (!isOpen) { item.classList.add('open'); this.setAttribute('aria-expanded', 'true'); }
     });
   });
 }
 
-/* ─── Scroll reveal ─── */
+/* ── Scroll reveal ── */
 function setupReveal() {
   if (!('IntersectionObserver' in window)) return;
   const obs = new IntersectionObserver((entries) => {
@@ -53,7 +44,7 @@ function setupReveal() {
   document.querySelectorAll('.reveal').forEach((el) => obs.observe(el));
 }
 
-/* ─── Preview Card logic ─── */
+/* ── Preview Card ── */
 function setupPreviewCard() {
   const uploadArea    = $('uploadArea');
   const fileInput     = $('fileInput');
@@ -68,141 +59,145 @@ function setupPreviewCard() {
   const pcardCopy     = $('pcardCopy');
   const pcardAddMore  = $('pcardAddMore');
   const pcardClose    = $('pcardClose');
-
-  /* Engine elements (hidden DOM, engine writes to these) */
-  const origImg   = $('originalImage');
-  const procImg   = $('processedImage');
-  const dlBtn     = $('downloadBtn');
+  const origImg       = $('originalImage');
+  const procImg       = $('processedImage');
+  const dlBtn         = $('downloadBtn');
 
   let originalSrc  = '';
   let processedSrc = '';
-  let currentMode  = 'before';   // 'before' | 'after'
+  let currentMode  = 'before';
+  let cardShown    = false;
 
-  /* ── Show card with photo ── */
+  /* ── Show preview card ── */
   function showCard(src) {
+    if (cardShown) return; // prevent double-show
+    cardShown = true;
     originalSrc = src;
     currentMode = 'before';
     pcardDisplay.src = src;
     hide(uploadArea);
     show(previewCard);
-    show(pcardProcess);    // spinner on
+    show(pcardProcess);
     hide(pcardToggle);
     hide(pcardActions);
-    pcardBefore.classList.add('active');
-    pcardAfter.classList.remove('active');
+    if (pcardBefore) pcardBefore.classList.add('active');
+    if (pcardAfter)  pcardAfter.classList.remove('active');
     previewCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  /* ── Called when engine finishes (processedImage has src) ── */
-  function onProcessingDone(src) {
+  /* ── Called when engine finishes ── */
+  function onDone(src) {
     processedSrc = src;
-    hide(pcardProcess);   // spinner off
+    hide(pcardProcess);
     show(pcardToggle);
     show(pcardActions);
-    // Auto-switch to After so user sees the result
     setMode('after');
   }
 
-  /* ── Toggle Before / After ── */
+  /* ── Toggle Before/After ── */
   function setMode(mode) {
     currentMode = mode;
     if (mode === 'after' && processedSrc) {
       pcardDisplay.src = processedSrc;
-      pcardAfter.classList.add('active');
-      pcardBefore.classList.remove('active');
+      pcardAfter?.classList.add('active');
+      pcardBefore?.classList.remove('active');
     } else {
       pcardDisplay.src = originalSrc;
-      pcardBefore.classList.add('active');
-      pcardAfter.classList.remove('active');
+      pcardBefore?.classList.add('active');
+      pcardAfter?.classList.remove('active');
     }
   }
 
-  /* ── Reset to upload zone ── */
+  /* ── Reset ── */
   function reset() {
-    originalSrc  = '';
-    processedSrc = '';
-    currentMode  = 'before';
-    pcardDisplay.src = '';
+    cardShown = false;
+    originalSrc = processedSrc = '';
+    currentMode = 'before';
+    if (pcardDisplay) pcardDisplay.src = '';
     hide(previewCard);
     show(uploadArea);
-    uploadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    // Also reset engine state
     if (fileInput) fileInput.value = '';
+    uploadArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  /* ── Watch processedImage for src change (engine result signal) ── */
-  if (procImg) {
-    procImg.addEventListener('load', () => {
-      if (procImg.src && procImg.src !== window.location.href) {
-        onProcessingDone(procImg.src);
+  /* ═══════════════════════════════════════════════════════════
+     PRIMARY FIX: Watch #originalImage.load
+     The engine ALWAYS sets originalImage.src when it reads a file
+     — whether via dialog OR drop. This is the most reliable signal.
+  ═══════════════════════════════════════════════════════════ */
+  if (origImg) {
+    origImg.addEventListener('load', () => {
+      if (origImg.src && origImg.naturalWidth > 0 && origImg.src !== window.location.href) {
+        showCard(origImg.src); // show card with engine's own loaded image
       }
     });
-    // Also watch via MutationObserver (engine may set src directly)
+  }
+
+  /* Watch processedImage — engine sets this when done */
+  if (procImg) {
+    procImg.addEventListener('load', () => {
+      const s = procImg.src;
+      if (s && s !== window.location.href && s !== processedSrc && procImg.naturalWidth > 0) {
+        onDone(s);
+      }
+    });
     new MutationObserver(() => {
       const s = procImg.getAttribute('src');
-      if (s && s !== processedSrc && s.startsWith('data:')) {
-        onProcessingDone(s);
-      }
+      if (s && s.startsWith('data:') && s !== processedSrc) onDone(s);
     }).observe(procImg, { attributes: true, attributeFilter: ['src'] });
   }
 
-  /* Watch downloadBtn appearing — engine shows it when done */
+  /* Watch downloadBtn as extra "done" signal */
   if (dlBtn) {
     new MutationObserver(() => {
-      const visible = dlBtn.style.display !== 'none';
-      if (visible && procImg && procImg.src && procImg.src !== window.location.href) {
-        onProcessingDone(procImg.src);
+      if (dlBtn.style.display !== 'none' && procImg?.src && procImg.src !== window.location.href) {
+        onDone(procImg.src);
       }
     }).observe(dlBtn, { attributes: true, attributeFilter: ['style'] });
   }
 
-  /* ── File input change → show card ── */
-  function handleFile(file) {
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (e) => showCard(e.target.result);
-    reader.readAsDataURL(file);
-  }
-
-  if (fileInput) {
-    fileInput.addEventListener('change', () => {
-      if (fileInput.files[0]) handleFile(fileInput.files[0]);
-    });
-  }
-
-  /* ── Drag & drop on uploadArea ── */
+  /* ══════════════════════════════════
+     Drag & Drop on upload area
+     (engine doesn't intercept drop events — we must handle these)
+  ══════════════════════════════════ */
   if (uploadArea) {
     uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
     uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
     uploadArea.addEventListener('drop', (e) => {
       e.preventDefault();
       uploadArea.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file) {
-        handleFile(file);
-        // Also pass to engine via fileInput
-        try {
-          const dt = new DataTransfer(); dt.items.add(file);
-          fileInput.files = dt.files;
-          fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-        } catch (_) {}
-      }
+      const file = e.dataTransfer?.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      // Immediately show preview via FileReader (fast UX)
+      const reader = new FileReader();
+      reader.onload = (ev) => showCard(ev.target.result);
+      reader.readAsDataURL(file);
+      // Feed file to engine via fileInput change event
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (_) {}
     });
-    uploadArea.addEventListener('click', () => fileInput && fileInput.click());
-    uploadArea.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fileInput && fileInput.click(); });
   }
 
-  /* ── Ctrl+V paste ── */
+  /* ══════════════════════════════════
+     Ctrl+V paste
+  ══════════════════════════════════ */
   document.addEventListener('paste', (e) => {
-    const items = e.clipboardData && e.clipboardData.items;
+    const items = e.clipboardData?.items;
     if (!items) return;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith('image/')) {
-        const file = items[i].getAsFile();
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
         if (!file) break;
-        handleFile(file);
+        const reader = new FileReader();
+        reader.onload = (ev) => showCard(ev.target.result);
+        reader.readAsDataURL(file);
         try {
-          const dt = new DataTransfer(); dt.items.add(file);
+          const dt = new DataTransfer();
+          dt.items.add(file);
           fileInput.files = dt.files;
           fileInput.dispatchEvent(new Event('change', { bubbles: true }));
         } catch (_) {}
@@ -211,53 +206,45 @@ function setupPreviewCard() {
     }
   });
 
-  /* ── Toggle buttons ── */
-  if (pcardBefore) pcardBefore.addEventListener('click', () => setMode('before'));
-  if (pcardAfter)  pcardAfter.addEventListener('click',  () => setMode('after'));
+  /* Toggle buttons */
+  pcardBefore?.addEventListener('click', () => setMode('before'));
+  pcardAfter?.addEventListener('click',  () => setMode('after'));
 
-  /* ── Download: trigger engine's hidden download button ── */
-  if (pcardDownload) {
-    pcardDownload.addEventListener('click', () => {
-      if (dlBtn && dlBtn.style.display !== 'none') {
-        dlBtn.click();
-      } else if (processedSrc) {
-        // fallback: direct data URL download
-        const a = document.createElement('a');
-        a.href = processedSrc;
-        a.download = 'geminiclean-result.png';
-        a.click();
-      }
-    });
-  }
+  /* Download — trigger engine's hidden button */
+  pcardDownload?.addEventListener('click', () => {
+    if (dlBtn && dlBtn.style.display !== 'none') {
+      dlBtn.click();
+    } else if (processedSrc) {
+      const a = document.createElement('a');
+      a.href = processedSrc;
+      a.download = 'geminiclean-result.png';
+      a.click();
+    }
+  });
 
-  /* ── Copy to clipboard ── */
-  if (pcardCopy) {
-    pcardCopy.addEventListener('click', async () => {
-      const src = currentMode === 'after' && processedSrc ? processedSrc : originalSrc;
-      if (!src) return;
-      try {
-        const res = await fetch(src);
-        const blob = await res.blob();
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        pcardCopy.textContent = '✓ Copied!';
-        setTimeout(() => { pcardCopy.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy image'; }, 2000);
-      } catch (_) {
-        pcardCopy.textContent = 'Copy failed';
-        setTimeout(() => { pcardCopy.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy image'; }, 2000);
-      }
-    });
-  }
+  /* Copy image to clipboard */
+  pcardCopy?.addEventListener('click', async () => {
+    const src = (currentMode === 'after' && processedSrc) ? processedSrc : originalSrc;
+    if (!src) return;
+    try {
+      const res  = await fetch(src);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      pcardCopy.textContent = '✓ Copied!';
+      setTimeout(() => { pcardCopy.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy image'; }, 2000);
+    } catch (_) {
+      pcardCopy.textContent = 'Not supported';
+      setTimeout(() => { pcardCopy.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy image'; }, 2000);
+    }
+  });
 
-  /* ── Add more / Close = reset ── */
-  if (pcardAddMore) pcardAddMore.addEventListener('click', reset);
-  if (pcardClose)   pcardClose.addEventListener('click',   reset);
-
-  /* Also wire engine's hidden resetBtn */
-  const engReset = $('resetBtn');
-  if (engReset) engReset.addEventListener('click', reset);
+  /* Add more / Close → reset */
+  pcardAddMore?.addEventListener('click', reset);
+  pcardClose?.addEventListener('click',   reset);
+  $('resetBtn')?.addEventListener('click', reset);
 }
 
-/* ─── Loading overlay bridge ─── */
+/* ── Loading overlay bridge ── */
 function setupLoadingOverlay() {
   const overlay = $('loadingOverlay');
   if (!overlay) return;
@@ -269,7 +256,6 @@ function setupLoadingOverlay() {
   sync();
 }
 
-/* ─── Init ─── */
 document.addEventListener('DOMContentLoaded', () => {
   setupNavbar();
   setupFAQ();
