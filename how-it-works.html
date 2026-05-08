@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How Gemini Watermark Removal Works — Technical Guide | GeminiClean</title>
+  <meta name="description" content="Learn exactly how GeminiClean removes Google Gemini AI watermarks using mathematical Reverse Alpha Blending. Understand the detection algorithm, watermark catalog, and restoration formula." />
+  <link rel="canonical" href="https://geminiclean.online/how-it-works.html" />
+  <meta property="og:title" content="How Gemini Watermark Removal Works" />
+  <meta property="og:description" content="Deep technical guide: Reverse Alpha Blending, auto-detection, and the math behind perfect watermark removal." />
+  <meta property="og:url" content="https://geminiclean.online/how-it-works.html" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="images/favicon.ico" />
+  <script src="https://cdn.lordicon.com/lordicon.js"></script>
+  <style>
+    .math-block {
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-left: 3px solid var(--indigo);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      margin: 1.25rem 0;
+      overflow-x: auto;
+    }
+    .step-timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline-item { display: flex; gap: 1.5rem; position: relative; padding-bottom: 2rem; }
+    .timeline-item:last-child { padding-bottom: 0; }
+    .timeline-dot {
+      width: 44px; height: 44px; flex-shrink: 0;
+      background: var(--grad-btn); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; color: #fff; font-size: 0.95rem;
+      position: relative; z-index: 1;
+    }
+    .timeline-item:not(:last-child) .timeline-dot::after {
+      content: '';
+      position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+      width: 2px; height: calc(100% + 2rem - 44px);
+      background: linear-gradient(to bottom, var(--indigo), transparent);
+    }
+    .timeline-content { padding-top: 0.6rem; flex: 1; }
+    .timeline-content h3 { color: var(--text-primary); margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+<div class="bg-mesh"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar" role="navigation" aria-label="Main navigation">
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-icon">
+      <lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="loop" delay="2000" colors="primary:#ffffff" style="width:22px;height:22px"></lord-icon>
+    </div>
+    <span>GeminiClean</span>
+  </a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="index.html">Tool</a></li>
+    <li><a href="how-it-works.html" class="active">How It Works</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html">Contact</a></li>
+    <li><a href="index.html" class="nav-cta">Get Started Free</a></li>
+  </ul>
+  <button class="nav-hamburger" id="navHamburger" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+</nav>
+
+<!-- AD LEADERBOARD -->
+<div class="container">
+  </div>
+
+<main class="page-wrap" id="mainContent">
+
+  <!-- PAGE HERO -->
+  <section class="page-hero container" aria-labelledby="pageTitle">
+    <div class="breadcrumb">
+      <a href="index.html">Home</a>
+      <span class="breadcrumb-sep">›</span>
+      <span>How It Works</span>
+    </div>
+    <span class="section-label">
+      <lord-icon src="https://cdn.lordicon.com/hwjcdmbl.json" trigger="loop" delay="2000" colors="primary:#a78bfa" style="width:14px;height:14px"></lord-icon>
+      Technical Deep Dive
+    </span>
+    <h1 id="pageTitle">How <span class="gradient-text">Gemini Watermark Removal</span> Works</h1>
+    <p style="max-width:600px;margin-top:0.75rem;">A complete technical explanation of the auto-detection algorithm, the Reverse Alpha Blending mathematics, and the restoration validation pipeline used by GeminiClean.</p>
+  </section>
+
+  <!-- OVERVIEW -->
+  <section class="section" aria-labelledby="overviewHeading">
+    <div class="container" style="max-width:900px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:3rem;" class="feature-grid">
+        <div class="glass-card feature-card">
+          <div class="feature-icon-wrap">
+            <lord-icon src="https://cdn.lordicon.com/ndydpcaq.json" trigger="hover" colors="primary:#6366f1" style="width:28px;height:28px"></lord-icon>
+          </div>
+          <h3>No AI Guessing</h3>
+          <p>Unlike AI-based tools, this uses pure mathematical inversion — the exact reverse of how the watermark was applied.</p>
+        </div>
+        <div class="glass-card feature-card">
+          <div class="feature-icon-wrap">
+            <lord-icon src="https://cdn.lordicon.com/hwjcdmbl.json" trigger="hover" colors="primary:#8b5cf6" style="width:28px;height:28px"></lord-icon>
+          </div>
+          <h3>Auto-Detection Engine</h3>
+          <p>Size catalog lookup + local anchor search ensures accurate watermark location even for edge-case image sizes.</p>
+        </div>
+        <div class="glass-card feature-card">
+          <div class="feature-icon-wrap">
+            <lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="hover" colors="primary:#06b6d4" style="width:28px;height:28px"></lord-icon>
+          </div>
+          <h3>Float32 Precision</h3>
+          <p>All intermediate calculations use 32-bit floating point to prevent rounding errors from accumulating.</p>
+        </div>
+        <div class="glass-card feature-card">
+          <div class="feature-icon-wrap">
+            <lord-icon src="https://cdn.lordicon.com/oqdmuxru.json" trigger="hover" colors="primary:#22c55e" style="width:28px;height:28px"></lord-icon>
+          </div>
+          <h3>Validation Gate</h3>
+          <p>Restoration is only applied after confirming the detected region is actually a Gemini watermark — avoiding false positives.</p>
+        </div>
+      </div>
+
+      <!-- THE MATH -->
+      <h2 id="overviewHeading" style="margin-bottom:1rem;">The Gemini Watermarking Process</h2>
+      <p>Google Gemini applies its sparkle watermark using <strong>standard alpha compositing</strong>. Every watermarked pixel is the result of blending the semi-transparent white logo over the original image pixel:</p>
+
+      <div class="math-block">
+        watermarked = α × logo + (1 − α) × original
+      </div>
+
+      <p>Where:</p>
+      <ul style="padding-left:1.25rem;list-style:disc;color:var(--text-secondary);display:flex;flex-direction:column;gap:0.4rem;margin:1rem 0;">
+        <li><strong style="color:var(--text-primary);">watermarked</strong> — the pixel value we observe in the image</li>
+        <li><strong style="color:var(--text-primary);">α</strong> — the alpha (opacity) of the watermark at that pixel (0.0 – 1.0)</li>
+        <li><strong style="color:var(--text-primary);">logo</strong> — the watermark logo color (white = 255 for Gemini's sparkle)</li>
+        <li><strong style="color:var(--text-primary);">original</strong> — the raw pixel value we want to recover</li>
+      </ul>
+
+      <h2 style="margin:2.5rem 0 1rem;">The Reverse Solution</h2>
+      <p>Since <code>logo</code> (white) and <code>α</code> are both known from Gemini's catalog, we can solve algebraically for <code>original</code>:</p>
+
+      <div class="math-block">
+        original = (watermarked − α × logo) / (1 − α)
+      </div>
+
+      <p>This is computed independently for each R, G, B channel with <strong>Float32 precision</strong>. The result is clamped to [0, 255] and the boundary region receives a 2-pixel smooth blend to eliminate any visible edge artifacts.</p>
+    </div>
+  </section>
+
+  <!-- DETECTION PIPELINE -->
+  <section class="section" style="background:var(--bg-secondary);" aria-labelledby="detectionHeading">
+    <div class="container" style="max-width:820px;">
+      <div style="text-align:center;margin-bottom:2.5rem;">
+        <span class="section-label">Detection Engine</span>
+        <h2 id="detectionHeading">Layered Watermark Detection</h2>
+        <p>Three validation stages ensure accurate removal without false positives.</p>
+      </div>
+
+      <div class="step-timeline">
+        <div class="timeline-item">
+          <div class="timeline-dot">1</div>
+          <div class="timeline-content">
+            <h3>Size Catalog Lookup</h3>
+            <p>The engine first matches the image dimensions against Gemini's known output size catalog. Images 1025×1025px or larger use a 96×96px watermark at 64px margins; smaller images use a 48×48px watermark at 32px margins.</p>
+            <div class="glass-card" style="padding:1rem;margin-top:0.75rem;overflow-x:auto;">
+              <table class="data-table">
+                <thead><tr><th>Condition</th><th>Watermark Size</th><th>Right Margin</th><th>Bottom Margin</th></tr></thead>
+                <tbody>
+                  <tr><td>Large outputs (≥1025px)</td><td>96 × 96 px</td><td>64 px</td><td>64 px</td></tr>
+                  <tr><td>Small outputs (&lt;1025px)</td><td>48 × 48 px</td><td>32 px</td><td>32 px</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="timeline-dot">2</div>
+          <div class="timeline-content">
+            <h3>Local Anchor Search</h3>
+            <p>The predicted watermark region is scanned pixel-by-pixel to verify the presence of a bright semi-transparent overlay. A brightness sampling pass checks whether the detected area contains the characteristic high-luminance pixels of the Gemini sparkle logo. If the sample fails the threshold test, removal is skipped.</p>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="timeline-dot">3</div>
+          <div class="timeline-content">
+            <h3>Restoration &amp; Validation</h3>
+            <p>If detection is confirmed, the Reverse Alpha Blending formula is applied. A 4-point star alpha map is synthesised to match Gemini's sparkle geometry. High-alpha pixels (≥0.95) where division would be unstable are replaced with a neighbour-average estimate. A 2-pixel boundary smoothing pass eliminates visible seam lines at the edges of the restored region.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AD MID PAGE -->
+  <div class="container">
+    </div>
+
+  <!-- LIMITATIONS -->
+  <section class="section" aria-labelledby="limitationsHeading">
+    <div class="container" style="max-width:820px;">
+      <div style="text-align:center;margin-bottom:2rem;">
+        <span class="section-label">Transparency</span>
+        <h2 id="limitationsHeading">Known Limitations</h2>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.85rem;">
+        <div class="alert alert-warning">
+          <lord-icon src="https://cdn.lordicon.com/vyukcgvf.json" trigger="in" colors="primary:#f59e0b" style="width:26px;height:26px;flex-shrink:0"></lord-icon>
+          <div><strong>Visible watermarks only.</strong> This tool removes Gemini's semi-transparent sparkle logo in the bottom-right corner. Invisible SynthID steganographic watermarks are not affected.</div>
+        </div>
+        <div class="alert alert-info">
+          <lord-icon src="https://cdn.lordicon.com/msoeawqm.json" trigger="in" colors="primary:#06b6d4" style="width:26px;height:26px;flex-shrink:0"></lord-icon>
+          <div><strong>Gemini watermarks only.</strong> The algorithm is calibrated specifically for Google Gemini's known output catalog. It is not a general-purpose watermark remover.</div>
+        </div>
+        <div class="alert alert-info">
+          <lord-icon src="https://cdn.lordicon.com/msoeawqm.json" trigger="in" delay="200" colors="primary:#06b6d4" style="width:26px;height:26px;flex-shrink:0"></lord-icon>
+          <div><strong>Canvas Fingerprint Defenders.</strong> Browser extensions that override Canvas API behavior (e.g., Canvas Fingerprint Defender) may cause processing errors. Disable them on this page if you experience issues.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section" id="faq" style="background:var(--bg-secondary);" aria-labelledby="faqTechHeading">
+    <div class="container" style="max-width:800px;">
+      <div style="text-align:center;margin-bottom:2.5rem;">
+        <span class="section-label">FAQ</span>
+        <h2 id="faqTechHeading">Technical Questions</h2>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">Why use Float32 instead of integer math?<svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-answer"><p>Standard image pixel values are 8-bit integers (0–255). When performing division during reverse blending, rounding at every step accumulates errors. Using Float32 for intermediary calculations preserves sub-pixel precision throughout the entire pipeline, with final clamping only at the output stage.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">Why is the output always PNG?<svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-answer"><p>JPEG compression is lossy and would introduce new artifacts in the very pixels we just mathematically restored. PNG is lossless, ensuring the precise pixel values calculated by the Reverse Alpha Blending formula are preserved exactly in the output file.</p></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" aria-expanded="false">Why is a Web Worker used for processing?<svg class="faq-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-answer"><p>Image processing on large files (e.g., 4K resolution) involves millions of pixel calculations. Running this on the main JavaScript thread would freeze the browser UI. A Web Worker runs the computation on a background thread, keeping the interface responsive throughout processing.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section" aria-labelledby="ctaHeading">
+    <div class="container" style="text-align:center;max-width:600px;">
+      <lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="loop" delay="1500" colors="primary:#a78bfa" style="width:64px;height:64px;margin:0 auto 1.5rem;"></lord-icon>
+      <h2 id="ctaHeading">Ready to Remove Your Watermark?</h2>
+      <p style="margin:1rem 0 2rem;">Try GeminiClean now — free, instant, private.</p>
+      <a href="index.html#tool" class="btn btn-primary btn-lg" id="ctaToolBtn">
+        <lord-icon src="https://cdn.lordicon.com/wloilxuq.json" trigger="hover" colors="primary:#ffffff" style="width:20px;height:20px"></lord-icon>
+        Open the Tool
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="index.html" class="nav-logo" style="display:inline-flex;margin-bottom:0.75rem;">
+          <div class="nav-logo-icon"><lord-icon src="https://cdn.lordicon.com/dxjqoygy.json" trigger="loop" delay="2000" colors="primary:#ffffff" style="width:18px;height:18px"></lord-icon></div>
+          <span>GeminiClean</span>
+        </a>
+        <p>The most reliable, privacy-first Gemini AI watermark removal tool.</p>
+      </div>
+      <div class="footer-col"><h4>Tool</h4><a href="index.html">Watermark Remover</a><a href="how-it-works.html">How It Works</a><a href="about.html">About</a></div>
+      <div class="footer-col"><h4>Support</h4><a href="contact.html">Contact Us</a><a href="how-it-works.html#faq">FAQ</a></div>
+      <div class="footer-col"><h4>Legal</h4><a href="privacy-policy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a></div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2025 GeminiClean. All rights reserved.</span>
+      <div style="display:flex;gap:1.25rem;"><a href="privacy-policy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/app.js"></script>
+</body>
+</html>
